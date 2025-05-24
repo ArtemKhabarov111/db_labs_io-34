@@ -4,7 +4,7 @@
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/ArtemKhabarov111/db_labs_io-34/main/assets/Lab6/PossibleRequests.png" width="1200" />
+<img src="https://raw.githubusercontent.com/ArtemKhabarov111/db_labs_io-34/main/assets/Lab6/PossibleRequests.png" width="1800" />
 
 </div>
 
@@ -12,7 +12,7 @@
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/ArtemKhabarov111/db_labs_io-34/main/assets/Lab6/Request.png" width="1200" />
+<img src="https://raw.githubusercontent.com/ArtemKhabarov111/db_labs_io-34/main/assets/Lab6/Request.png" width="1800" />
 
 </div>
 
