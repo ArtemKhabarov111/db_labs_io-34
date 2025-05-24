@@ -587,502 +587,339 @@ Telegram: <a href="https://t.me/wyrais">@wyrais</a></p>
 <li>SQL-скрипт для створення на початкового наповнення бази даних</li>
 <li>RESTfull сервіс для управління даними</li>
 </ul>
-<h2 id="sql-скрипт-для-створення-початкового-наповнення-бази-даних"><a class="header" href="#sql-скрипт-для-створення-початкового-наповнення-бази-даних">SQL-скрипт для створення початкового наповнення бази даних</a></h2>
-<pre><code>CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    email VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP
-);
-
-CREATE TABLE projects (
-    id SERIAL PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    description TEXT,
-    start_date DATE NOT NULL,
-    end_date DATE,
-    status VARCHAR(20) NOT NULL CHECK (status IN ('planned', 'in_progress', 'completed', 'on_hold'))
-);
-
-CREATE TABLE tasks (
-    id SERIAL PRIMARY KEY,
-    project_id INT NOT NULL,
-    title VARCHAR(100) NOT NULL,
-    description TEXT,
-    priority INT CHECK (priority BETWEEN 1 AND 5),
-    status VARCHAR(20) NOT NULL CHECK (status IN ('todo', 'in_progress', 'review', 'done')),
-    due_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-);
-
-CREATE TABLE usertasks (
-    user_id INT NOT NULL,
-    task_id INT NOT NULL,
-    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, task_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-);
-
-CREATE TABLE comments (
-    id SERIAL PRIMARY KEY,
-    task_id INT NOT NULL,
-    user_id INT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE attachments (
-    id SERIAL PRIMARY KEY,
-    task_id INT NOT NULL,
-    filename VARCHAR(255) NOT NULL,
-    filepath VARCHAR(255) NOT NULL,
-    filetype VARCHAR(50) NOT NULL,
-    filesize INT NOT NULL,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-);
-
-INSERT INTO users (username, email, password_hash) VALUES
-('john_doe', 'john.doe@example.com', '$2a$10$xJwL5v5Jz7t6V7V7V7V7Ve'),
-('jane_smith', 'jane.smith@example.com', '$2a$10$xJwL5v5Jz7t6V7V7V7V7Ve'),
-('mike_johnson', 'mike.johnson@example.com', '$2a$10$xJwL5v5Jz7t6V7V7V7V7Ve');
-
-INSERT INTO projects (title, description, start_date, status) VALUES
-('Website Redesign', 'Complete redesign of company website', '2024-01-15', 'in_progress'),
-('Mobile App Development', 'Development of new mobile application', '2024-02-01', 'planned'),
-('Marketing Campaign', 'Q2 marketing campaign preparation', '2024-03-01', 'planned');
-
-INSERT INTO tasks (project_id, title, description, priority, status) VALUES
-(1, 'Design Homepage', 'Create new homepage design', 1, 'in_progress'),
-(1, 'Develop Contact Form', 'Implement new contact form with validation', 2, 'todo'),
-(2, 'App Prototyping', 'Create initial app prototype', 1, 'todo'),
-(3, 'Market Research', 'Conduct target audience research', 3, 'todo');
-
-INSERT INTO usertasks (user_id, task_id) VALUES
-(1, 1), (2, 2), (3, 3), (1, 4);
-
-INSERT INTO comments (task_id, user_id, content) VALUES
-(1, 2, 'Please review the initial design concepts'),
-(1, 1, 'Working on revisions based on feedback');
-
-INSERT INTO attachments (task_id, filename, filepath, filetype, filesize) VALUES
-(1, 'design_concepts.pdf', '/uploads/design_concepts.pdf', 'application/pdf', 2540000);
-</code></pre>
-<h1 id="restfull-сервіс-для-управління-даними"><a class="header" href="#restfull-сервіс-для-управління-даними">RESTfull сервіс для управління даними</a></h1>
-<h2 id="Підключення-до-бази-даних"><a class="header" href="#Підключення-до-бази-даних">Підключення до бази даних</a></h2>
-<pre><code>import pg from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const pool = new pg.Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-});
-
-export default pool;
-</code></pre>
-<h2 id="Моделі-для-роботи-з-даними"><a class="header" href="#Моделі-для-роботи-з-даними">Моделі для роботи з даними</a></h2>
-<pre><code>import pool from '../db.js';
-
-export const getUserById = async (id) =&gt; {
-  const result = await pool.query('SELECT * FROM Users WHERE id = $1', [id]);
-  return result.rows[0];
-};
-
-export const createUser = async (username, email, passwordHash) =&gt; {
-  const result = await pool.query(
-    'INSERT INTO Users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
-    [username, email, passwordHash]
-  );
-  return result.rows[0];
-};
-</code></pre>
-<h2 id="Контролери-для-обробки-запитів"><a class="header" href="#Контролери-для-обробки-запитів">Контролери для обробки запитів</a></h2>
-<pre><code>import * as userModel from '../models/userModel.js';
-
-export const getUser = async (req, res) =&gt; {
-  try {
-    const user = await userModel.getUserById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const createUser = async (req, res) =&gt; {
-  try {
-    const newUser = await userModel.createUser(
-      req.body.username,
-      req.body.email,
-      req.body.password
-    );
-    res.status(201).json(newUser);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-</code></pre>
-<h2 id="Маршрутизація"><a class="header" href="#Маршрутизація">Маршрутизація</a></h2>
-<pre><code>import express from 'express';
-import { getUser, createUser } from '../controllers/userController.js';
-
-const router = express.Router();
-
-router.get('/:id', getUser);
-router.post('/', createUser);
-
-export default router;
-</code></pre>
-<h2 id="Налаштування-сервера"><a class="header" href="#Налаштування-сервера">Налаштування сервера</a></h2>
-<pre><code>import express from 'express';
-import userRouter from './routes/userRoutes.js';
-import projectRouter from './routes/projectRoutes.js';
-import taskRouter from './routes/taskRoutes.js';
-
-const app = express();
-
-app.use(express.json());
-
-app.use('/api/users', userRouter);
-app.use('/api/projects', projectRouter);
-app.use('/api/tasks', taskRouter);
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =&gt; {
-  console.log(`Server running on port ${PORT}`);
-});
-</code></pre>
-<h2 id="Запуск-сервера"><a class="header" href="#Запуск-сервера">Запуск сервера</a></h2>
-<pre><code>import app from './app.js';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const startServer = () =&gt; {
-  const port = process.env.PORT || 3000;
-  app.listen(port, () =&gt; {
-    console.log(`Server is running on port ${port}`);
-  });
-};
-
-startServer();
-</code></pre>
-<h2 id="Маршрути-для-user-та-mediacontent"><a class="header" href="#Маршрути-для-user-та-mediacontent">Маршрути для User та MediaContent</a></h2>
-<h3 id="Маршрути-для-user"><a class="header" href="#Маршрути-для-user">Маршрути для User</a></h3>
-<pre><code>// routes/userRoutes.js
-
-import express from 'express';
-import {
-  registerUser,
-  listUsers,
-  getUser,
-  updateUser,
-  removeUser,
-} from '../controllers/userController.js';
-
-const userRouter = express.Router();
-
-userRouter.post('/user', registerUser);
-userRouter.get('/user', listUsers);
-userRouter.get('/user/:id', getUser);
-userRouter.patch('/user/:id', updateUser);
-userRouter.delete('/user/:id', removeUser);
-
-export default userRouter;
-</code></pre>
-<h3 id="Маршрути-для-mediacontent"><a class="header" href="#Маршрути-для-mediacontent">Маршрути для MediaContent</a></h3>
-<pre><code>import express from 'express';
-import {
-  createMediaContent,
-  getMediaContents,
-  getMediaContent,
-  updateMediaContent,
-  deleteMediaContent,
-} from '../controllers/mediaContentController.js';
-
-const mediaContentRouter = express.Router();
-
-mediaContentRouter.post('/content', createMediaContent);
-mediaContentRouter.get('/content', getMediaContents);
-mediaContentRouter.get('/content/:id', getMediaContent);
-mediaContentRouter.patch('/content/:id', updateMediaContent);
-mediaContentRouter.delete('/content/:id', deleteMediaContent);
-
-export default mediaContentRouter;
-</code></pre>
-<h2 id="Контролери-для-user"><a class="header" href="#Контролери-для-user">Контролери для User</a></h2>
-<pre><code>import {
-  createProfile,
-  fetchAllProfiles,
-  findUserById,
-  updateProfileById,
-  deleteProfileById,
-  findUserByEmail,
-} from '../models/userModel.js';
-import AppError from '../utils/appError.js';
-import handleAsync from '../utils/handleAsync.js';
-import { validateRequiredFields } from '../utils/validator.js';
-
-export const registerUser = handleAsync(async (req, res) =&gt; {
-  const userData = req.body;
-  validateRequiredFields(userData);
-  const existing = await findUserByEmail(userData.email);
-  if (existing) {
-    throw new AppError('AlreadyRegisteredException', 400);
-  }
-  await createProfile(userData);
-  res.status(201).json({ status: 'success', message: 'User registered successfully' });
-});
-
-export const listUsers = handleAsync(async (req, res) =&gt; {
-  const users = await fetchAllProfiles();
-  res.status(200).json({ status: 'success', message: users });
-});
-
-export const getUser = handleAsync(async (req, res) =&gt; {
-  const { id } = req.params;
-  const user = await findUserById(id);
-  if (!user) {
-    throw new AppError('UserNotFoundException', 404);
-  }
-  res.status(200).json({ status: 'success', message: user });
-});
-
-export const updateUser = handleAsync(async (req, res) =&gt; {
-  const { id } = req.params;
-  const updates = req.body;
-  const user = await findUserById(id);
-  if (!user) {
-    throw new AppError('UserNotFoundException', 404);
-  }
-  const updated = await updateProfileById(id, updates);
-  res.status(200).json({ status: 'success', message: 'User updated successfully', updatedUser: updated });
-});
-
-export const removeUser = handleAsync(async (req, res) =&gt; {
-  const { id } = req.params;
-  const user = await findUserById(id);
-  if (!user) {
-    throw new AppError('UserNotFoundException', 404);
-  }
-  await deleteProfileById(id);
-  res.status(200).json({ status: 'success', message: 'User deleted successfully' });
-});
-</code></pre>
-<h2 id="Взаємодія-з-базою-даних-для-user"><a class="header" href="#Взаємодія-з-базою-даних-для-user">Взаємодія з базою даних для User</a></h2>
-<pre><code>import pool from '../db.js';
-
-export const createProfile = async ({ first_name, last_name, email, password_hash }) =&gt; {
-  const query = `
-    INSERT INTO Users (first_name, last_name, email, password_hash)
-    VALUES ($1, $2, $3, $4)
-  `;
-  return await pool.query(query, [first_name, last_name, email, password_hash]);
-};
-
-export const fetchAllProfiles = async () =&gt; {
-  const result = await pool.query('SELECT * FROM Users');
-  return result.rows;
-};
-
-export const findUserById = async (id) =&gt; {
-  const result = await pool.query('SELECT * FROM Users WHERE id = $1', [id]);
-  return result.rows[0];
-};
-
-export const updateProfileById = async (id, data) =&gt; {
-  const fields = Object.keys(data);
-  const values = Object.values(data);
-  const setClause = fields.map((f, i) =&gt; `${f} = $${i + 1}`).join(', ');
-  const result = await pool.query(
-    `UPDATE Users SET ${setClause} WHERE id = $${fields.length + 1} RETURNING *`,
-    [...values, id]
-  );
-  return result.rows[0];
-};
-
-export const deleteProfileById = async (id) =&gt; {
-  await pool.query('DELETE FROM Users WHERE id = $1', [id]);
-};
-
-export const findUserByEmail = async (email) =&gt; {
-  const result = await pool.query('SELECT * FROM Users WHERE email = $1', [email]);
-  return result.rows[0];
-};
-</code></pre>
-<h2 id="Контролери-для-mediacontent"><a class="header" href="#Контролери-для-mediacontent">Контролери для MediaContent</a></h2>
-<pre><code>
-import handleAsync from '../utils/handleAsync.js';
-import {
-  insertMediaContent,
-  getAllMediaContents,
-  getMediaContentById,
-  updateMediaContentById,
-  deleteMediaContentById,
-} from '../models/mediaContentModel.js';
-import AppError from '../utils/appError.js';
-import { validateRequiredContentFields } from '../utils/validator.js';
-
-export const createMediaContent = handleAsync(async (req, res) =&gt; {
-  const contentData = req.body;
-  validateRequiredContentFields(contentData);
-  const newContent = await insertMediaContent(contentData);
-  res.status(201).json({ status: 'success', data: newContent });
-});
-
-export const getMediaContents = handleAsync(async (req, res) =&gt; {
-  const contents = await getAllMediaContents();
-  res.status(200).json({ status: 'success', data: contents });
-});
-
-export const getMediaContent = handleAsync(async (req, res) =&gt; {
-  const { id } = req.params;
-  const content = await getMediaContentById(id);
-  if (!content) {
-    throw new AppError('MediaContentNotFoundException', 404);
-  }
-  res.status(200).json({ status: 'success', data: content });
-});
-
-export const updateMediaContent = handleAsync(async (req, res) =&gt; {
-  const { id } = req.params;
-  const updates = req.body;
-  const content = await getMediaContentById(id);
-  if (!content) {
-    throw new AppError('MediaContentNotFoundException', 404);
-  }
-  const updated = await updateMediaContentById(id, updates);
-  res.status(200).json({ status: 'success', data: updated });
-});
-
-export const deleteMediaContent = handleAsync(async (req, res) =&gt; {
-  const { id } = req.params;
-  const deleted = await deleteMediaContentById(id);
-  if (!deleted) {
-    throw new AppError('MediaContentNotFoundException', 404);
-  }
-  res.status(200).json({ status: 'success', message: 'Media content deleted successfully' });
-});
-</code></pre>
-<h2 id="Взаємодія-з-базою-даних-для-mediacontent"><a class="header" href="#Взаємодія-з-базою-даних-для-mediacontent">Взаємодія з базою даних для MediaContent</a></h2>
-<pre><code>import pool from '../db.js';
-import AppError from '../utils/appError.js';
-
-export const insertMediaContent = async ({
-  title,
-  description,
-  body,
-  content_type,
-  user_id,
-}) =&gt; {
-  const result = await pool.query(
-    `INSERT INTO MediaContent (title, description, body, content_type, user_id)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [title, description, body, content_type, user_id]
-  );
-  return result.rows[0];
-};
-
-export const getAllMediaContents = async () =&gt; {
-  const result = await pool.query('SELECT * FROM MediaContent');
-  return result.rows;
-};
-
-export const getMediaContentById = async (id) =&gt; {
-  const result = await pool.query('SELECT * FROM MediaContent WHERE id = $1', [id]);
-  return result.rows[0] || null;
-};
-
-export const updateMediaContentById = async (id, data) =&gt; {
-  const fields = Object.keys(data);
-  const values = Object.values(data);
-  if (!fields.length) {
-    throw new AppError('NoFieldsToUpdateException', 400);
-  }
-  const setClause = fields.map((f, i) =&gt; `${f} = $${i + 1}`).join(', ');
-  const result = await pool.query(
-    `UPDATE MediaContent SET ${setClause} WHERE id = $${fields.length + 1} RETURNING *`,
-    [...values, id]
-  );
-  return result.rows[0];
-};
-
-export const deleteMediaContentById = async (id) =&gt; {
-  const result = await pool.query(
-    'DELETE FROM MediaContent WHERE id = $1 RETURNING *',
-    [id]
-  );
-  return result.rows[0] || null;
-};
-</code></pre>
-<h2 id="Мідлвар-для-обробки-помилок"><a class="header" href="#Мідлвар-для-обробки-помилок">Мідлвар для обробки помилок</a></h2>
-<pre><code>const errorHandler = (err, req, res, next) =&gt; {
-  console.error(err);
-  err.statusCode = err.statusCode || 500;
-  err.status = err.status || 'error';
-  res.status(err.statusCode).json({ status: err.status, message: err.message });
-};
-
-export default errorHandler;
-</code></pre>
-<h2 id="Обгортка-над-функціями-для-перенаправлення-помилок"><a class="header" href="#Обгортка-над-функціями-для-перенаправлення-помилок">Обгортка над функціями для перенаправлення помилок</a></h2>
-<pre><code>
-const handleAsync = (fn) =&gt; (req, res, next) =&gt; {
-  fn(req, res, next).catch(next);
-};
-
-export default handleAsync;
-</code></pre>
-<h2 id="Валідатори-для-перевірки-вхідних-даних"><a class="header" href="#Валідатори-для-перевірки-вхідних-даних">Валідатори для перевірки вхідних даних</a></h2>
-<pre><code>
-import AppError from './appError.js';
-
-export const validateRequiredFields = ({
-  first_name,
-  last_name,
-  email,
-  password_hash,
-}) =&gt; {
-  if (!first_name || !last_name || !email || !password_hash) {
-    throw new AppError('DataMissingException', 400);
-  }
-};
-
-export const validateRequiredContentFields = ({
-  title,
-  body,
-  content_type,
-  user_id,
-}) =&gt; {
-  if (!title || !body || !content_type || !user_id) {
-    throw new AppError('RequiredFieldsMissingException', 400);
-  }
-};
-</code></pre>
-<h2 id="Модифікований-клас-помилки"><a class="header" href="#Модифікований-клас-помилки">Модифікований клас помилки</a></h2>
-<pre><code>
-export default class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
-</code></pre>
+<h2 id="sql-скрипт-для-створення-та-початкового-наповнення-бази-даних"><a class="header" href="#sql-скрипт-для-створення-та-початкового-наповнення-бази-даних">SQL-скрипт для створення та початкового наповнення бази даних</a></h2>
+<p>-- MySQL Workbench Forward Engineering</p>
+<p>SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';</p>
+<hr />
+<p>-- Schema default_schema</p>
+<hr />
+<hr />
+<p>-- Schema Lab4</p>
+<hr />
+<p>DROP SCHEMA IF EXISTS <code>Lab4</code> ;</p>
+<hr />
+<p>-- Schema Lab4</p>
+<hr />
+<p>CREATE SCHEMA IF NOT EXISTS <code>Lab4</code> DEFAULT CHARACTER SET utf8 ;
+USE <code>Lab4</code> ;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Content</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Content</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Content</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>uploader_id</code> INT UNSIGNED NOT NULL,
+<code>title</code> VARCHAR(200) NOT NULL,
+<code>category</code> VARCHAR(50) NULL DEFAULT NULL,
+<code>url</code> VARCHAR(255) NOT NULL,
+PRIMARY KEY (<code>id</code>))
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Queue</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Queue</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Queue</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>reviewer_id</code> INT UNSIGNED NULL DEFAULT NULL,
+<code>status</code> VARCHAR(50) NULL DEFAULT NULL,
+<code>Content_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>id</code>, <code>Content_id</code>),
+INDEX <code>fk_Queue_Content_idx</code> (<code>Content_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_Queue_Content</code>
+FOREIGN KEY (<code>Content_id</code>)
+REFERENCES <code>Lab4</code>.<code>Content</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Label</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Label</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Label</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>text</code> VARCHAR(50) NOT NULL,
+PRIMARY KEY (<code>id</code>))
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>ContentLabel</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>ContentLabel</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>ContentLabel</code> (
+<code>Content_id</code> INT UNSIGNED NOT NULL,
+<code>Label_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>Content_id</code>, <code>Label_id</code>),
+INDEX <code>fk_ContentLabel_Content1_idx</code> (<code>Content_id</code> ASC) VISIBLE,
+INDEX <code>fk_ContentLabel_Label1_idx</code> (<code>Label_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_ContentLabel_Content1</code>
+FOREIGN KEY (<code>Content_id</code>)
+REFERENCES <code>Lab4</code>.<code>Content</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION,
+CONSTRAINT <code>fk_ContentLabel_Label1</code>
+FOREIGN KEY (<code>Label_id</code>)
+REFERENCES <code>Lab4</code>.<code>Label</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Subscription</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Subscription</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Subscription</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>account_id</code> INT UNSIGNED NOT NULL,
+<code>expires</code> DATE NULL DEFAULT NULL,
+<code>Content_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>id</code>, <code>Content_id</code>),
+INDEX <code>fk_Subscription_Content1_idx</code> (<code>Content_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_Subscription_Content1</code>
+FOREIGN KEY (<code>Content_id</code>)
+REFERENCES <code>Lab4</code>.<code>Content</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Account</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Account</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Account</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>settings</code> TEXT NULL DEFAULT NULL,
+<code>name</code> VARCHAR(50) NOT NULL,
+<code>email</code> VARCHAR(100) NOT NULL,
+PRIMARY KEY (<code>id</code>),
+UNIQUE INDEX <code>email_UNIQUE</code> (<code>email</code> ASC) VISIBLE)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>AccountSubscription</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>AccountSubscription</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>AccountSubscription</code> (
+<code>Subscription_id</code> INT UNSIGNED NOT NULL,
+<code>Subscription_Content_id</code> INT UNSIGNED NOT NULL,
+<code>Account_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>Subscription_id</code>, <code>Subscription_Content_id</code>, <code>Account_id</code>),
+INDEX <code>fk_AccountSubscription_Subscription1_idx</code> (<code>Subscription_id</code> ASC, <code>Subscription_Content_id</code> ASC) VISIBLE,
+INDEX <code>fk_AccountSubscription_Account1_idx</code> (<code>Account_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_AccountSubscription_Subscription1</code>
+FOREIGN KEY (<code>Subscription_id</code> , <code>Subscription_Content_id</code>)
+REFERENCES <code>Lab4</code>.<code>Subscription</code> (<code>id</code> , <code>Content_id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION,
+CONSTRAINT <code>fk_AccountSubscription_Account1</code>
+FOREIGN KEY (<code>Account_id</code>)
+REFERENCES <code>Lab4</code>.<code>Account</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Group</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Group</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Group</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>info</code> TEXT NULL DEFAULT NULL,
+<code>label</code> VARCHAR(100) NOT NULL,
+PRIMARY KEY (<code>id</code>))
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>AccountGroup</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>AccountGroup</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>AccountGroup</code> (
+<code>Group_id</code> INT UNSIGNED NOT NULL,
+<code>Account_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>Group_id</code>, <code>Account_id</code>),
+INDEX <code>fk_AccountGroup_Group1_idx</code> (<code>Group_id</code> ASC) VISIBLE,
+INDEX <code>fk_AccountGroup_Account1_idx</code> (<code>Account_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_AccountGroup_Group1</code>
+FOREIGN KEY (<code>Group_id</code>)
+REFERENCES <code>Lab4</code>.<code>Group</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION,
+CONSTRAINT <code>fk_AccountGroup_Account1</code>
+FOREIGN KEY (<code>Account_id</code>)
+REFERENCES <code>Lab4</code>.<code>Account</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>TaskScript</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>TaskScript</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>TaskScript</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>defenition</code> TEXT NULL DEFAULT NULL,
+<code>created</code> DATETIME NOT NULL,
+<code>title</code> VARCHAR(100) NOT NULL,
+PRIMARY KEY (<code>id</code>))
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Session</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Session</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Session</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>start_time</code> DATETIME NOT NULL,
+<code>end_time</code> DATETIME NULL DEFAULT NULL,
+<code>Account_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>id</code>, <code>Account_id</code>),
+INDEX <code>fk_Session_Account1_idx</code> (<code>Account_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_Session_Account1</code>
+FOREIGN KEY (<code>Account_id</code>)
+REFERENCES <code>Lab4</code>.<code>Account</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>SessionScriptLink</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>SessionScriptLink</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>SessionScriptLink</code> (
+<code>script_id</code> INT UNSIGNED NOT NULL,
+<code>TaskScript_id</code> INT UNSIGNED NOT NULL,
+<code>Session_id</code> INT UNSIGNED NOT NULL,
+<code>Session_Account_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>script_id</code>, <code>TaskScript_id</code>, <code>Session_id</code>, <code>Session_Account_id</code>),
+INDEX <code>fk_SesstionScriptLink_TaskScript1_idx</code> (<code>TaskScript_id</code> ASC) VISIBLE,
+INDEX <code>fk_SesstionScriptLink_Session1_idx</code> (<code>Session_id</code> ASC, <code>Session_Account_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_SesstionScriptLink_TaskScript1</code>
+FOREIGN KEY (<code>TaskScript_id</code>)
+REFERENCES <code>Lab4</code>.<code>TaskScript</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION,
+CONSTRAINT <code>fk_SesstionScriptLink_Session1</code>
+FOREIGN KEY (<code>Session_id</code> , <code>Session_Account_id</code>)
+REFERENCES <code>Lab4</code>.<code>Session</code> (<code>id</code> , <code>Account_id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>Result</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>Result</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>Result</code> (
+<code>id</code> INT UNSIGNED NOT NULL AUTO_INCREMENT,
+<code>session</code> INT UNSIGNED NOT NULL,
+<code>notes</code> TEXT NULL DEFAULT NULL,
+<code>score</code> FLOAT NULL DEFAULT NULL,
+PRIMARY KEY (<code>id</code>))
+ENGINE = InnoDB;</p>
+<hr />
+<p>-- Table <code>Lab4</code>.<code>SessionResultLink</code></p>
+<hr />
+<p>DROP TABLE IF EXISTS <code>Lab4</code>.<code>SessionResultLink</code> ;</p>
+<p>CREATE TABLE IF NOT EXISTS <code>Lab4</code>.<code>SessionResultLink</code> (
+<code>Session_id</code> INT UNSIGNED NOT NULL,
+<code>Session_Account_id</code> INT UNSIGNED NOT NULL,
+<code>Result_id</code> INT UNSIGNED NOT NULL,
+PRIMARY KEY (<code>Session_id</code>, <code>Session_Account_id</code>, <code>Result_id</code>),
+INDEX <code>fk_SessionResultLink_Session1_idx</code> (<code>Session_id</code> ASC, <code>Session_Account_id</code> ASC) VISIBLE,
+INDEX <code>fk_SessionResultLink_Result1_idx</code> (<code>Result_id</code> ASC) VISIBLE,
+CONSTRAINT <code>fk_SessionResultLink_Session1</code>
+FOREIGN KEY (<code>Session_id</code> , <code>Session_Account_id</code>)
+REFERENCES <code>Lab4</code>.<code>Session</code> (<code>id</code> , <code>Account_id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION,
+CONSTRAINT <code>fk_SessionResultLink_Result1</code>
+FOREIGN KEY (<code>Result_id</code>)
+REFERENCES <code>Lab4</code>.<code>Result</code> (<code>id</code>)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION)
+ENGINE = InnoDB;</p>
+<p>SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;</p>
+<hr />
+<p>-- Початкові дані для таблиць</p>
+<hr />
+<p>-- 1. Account
+INSERT INTO <code>Account</code> (<code>id</code>, <code>settings</code>, <code>name</code>,     <code>email</code>) VALUES
+(1, '{"theme":"light"}',  'Alice',   'alice@example.com'),
+(2, '{"theme":"dark"}',   'Bob',     'bob@example.com'),
+(3, '{"theme":"blue"}',   'Carol',   'carol@example.com'),
+(4, '{"theme":"solar"}',  'Dave',    'dave@example.com');</p>
+<p>-- 2. Content
+INSERT INTO <code>Content</code> (<code>id</code>, <code>uploader_id</code>, <code>title</code>,               <code>category</code>,  <code>url</code>) VALUES
+(1, 1, 'Intro to SQL',           'Database',  'https://…/sql1'),
+(2, 2, 'Advanced Python',        'Programming','https://…/py2'),
+(3, 1, 'Web Dev Basics',         'Web',       'https://…/web3'),
+(4, 3, 'Data Structures in C++', 'CS',        'https://…/cpp4');</p>
+<p>-- 3. Label
+INSERT INTO <code>Label</code> (<code>id</code>, <code>text</code>) VALUES
+(1, 'beginner'),
+(2, 'intermediate'),
+(3, 'advanced'),
+(4, 'reference');</p>
+<p>-- 4. ContentLabel
+INSERT INTO <code>ContentLabel</code> (<code>Content_id</code>, <code>Label_id</code>) VALUES
+(1, 1),
+(1, 4),
+(2, 2),
+(3, 1);</p>
+<p>-- 5. Subscription
+INSERT INTO <code>Subscription</code> (<code>id</code>, <code>account_id</code>, <code>expires</code>,    <code>Content_id</code>) VALUES
+(1, 1, '2025-12-31', 1),
+(2, 2, '2025-06-30', 3),
+(3, 1, '2025-09-15', 2),
+(4, 3, '2026-01-01', 4);</p>
+<p>-- 6. AccountSubscription
+INSERT INTO <code>AccountSubscription</code> (<code>Subscription_id</code>, <code>Subscription_Content_id</code>, <code>Account_id</code>) VALUES
+(1, 1, 1),
+(2, 3, 2),
+(3, 2, 1),
+(4, 4, 3);</p>
+<p>-- 7. Queue
+INSERT INTO <code>Queue</code> (<code>id</code>, <code>reviewer_id</code>, <code>status</code>,      <code>Content_id</code>) VALUES
+(1, 2, 'pending',    1),
+(2, 3, 'approved',   2),
+(3, NULL, 'in-review',3),
+(4, 4, 'rejected',   4);</p>
+<p>-- 8. <code>Group</code>
+INSERT INTO <code>Group</code> (<code>id</code>, <code>info</code>,                   <code>label</code>) VALUES
+(1, 'Engineering team',      'engineers'),
+(2, 'HR department',         'hr'),
+(3, 'Marketing crew',        'marketing'),
+(4, 'Support squad',         'support');</p>
+<p>-- 9. AccountGroup
+INSERT INTO <code>AccountGroup</code> (<code>Group_id</code>, <code>Account_id</code>) VALUES
+(1, 1),
+(1, 2),
+(4, 3),
+(2, 4);</p>
+<p>-- 10. TaskScript
+INSERT INTO <code>TaskScript</code> (<code>id</code>, <code>defenition</code>,          <code>created</code>,             <code>title</code>) VALUES
+(1, 'Solve SQL query',      '2025-05-01 10:00:00', 'SQL Basics'),
+(2, 'Implement class',      '2025-05-02 12:30:00', 'OOP Example'),
+(3, 'Build HTML form',      '2025-05-03 09:15:00', 'Web Form'),
+(4, 'Debug Python script',  '2025-05-04 14:45:00', 'Py Debugging');</p>
+<p>-- 11. Session
+INSERT INTO <code>Session</code> (<code>id</code>, <code>start_time</code>,           <code>end_time</code>,            <code>Account_id</code>) VALUES
+(1, '2025-05-10 08:00:00', '2025-05-10 09:00:00',  1),
+(2, '2025-05-10 10:00:00', '2025-05-10 11:30:00',  2),
+(3, '2025-05-11 14:00:00', NULL,                   1),
+(4, '2025-05-12 16:15:00', '2025-05-12 17:00:00',  3);</p>
+<p>-- 12. SessionScriptLink
+INSERT INTO <code>SessionScriptLink</code> (<code>script_id</code>, <code>TaskScript_id</code>, <code>Session_id</code>, <code>Session_Account_id</code>) VALUES
+(1, 1, 1, 1),
+(2, 2, 2, 2),
+(3, 3, 3, 1),
+(4, 4, 4, 3);</p>
+<p>-- 13. Result
+INSERT INTO <code>Result</code> (<code>id</code>, <code>session</code>, <code>notes</code>,                 <code>score</code>) VALUES
+(1, 1, 'Good job',             95.5),
+(2, 2, 'Needs improvement',    67.0),
+(3, 3, 'Incomplete',           40.0),
+(4, 4, 'Excellent',            100.0);</p>
+<p>-- 14. SessionResultLink
+INSERT INTO <code>SessionResultLink</code> (<code>Session_id</code>, <code>Session_Account_id</code>, <code>Result_id</code>) VALUES
+(1, 1, 1),
+(2, 2, 2),
+(3, 1, 3),
+(4, 3, 4);</p>
+<h2 id="restfull-сервіс-для-управління-даними"><a class="header" href="#restfull-сервіс-для-управління-даними">RESTfull сервіс для управління даними</a></h2>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="Тестування-працездатності-системи"><a class="header" href="#Тестування-працездатності-системи">Тестування працездатності системи</a></h1>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="Висновки-1"><a class="header" href="#Висновки-1">Висновки</a></h1>
 <p>У висновках наводять оцінку отриманих результатів, можливі галузі його використання. Висновки повинні містити в собі коротку узагальнену оцінку результатів розробки, у
