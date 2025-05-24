@@ -5,6 +5,7 @@
 - RESTfull сервіс для управління даними
 ## SQL-скрипт для створення та початкового наповнення бази даних
 
+```mysql
 -- MySQL Workbench Forward Engineering
 
 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
@@ -398,5 +399,10 @@ INSERT INTO `SessionResultLink` (`Session_id`, `Session_Account_id`, `Result_id`
   (2, 2, 2),
   (3, 1, 3),
   (4, 3, 4);
+
+```
+
+
+
 
 ## RESTfull сервіс для управління даними
