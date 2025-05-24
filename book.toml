@@ -4,7 +4,7 @@ multilingual = false
 src = "docs"
 
 # Замініть авторство проєкта на своє
-authors = ["Dmytro Shevchenko"]
+authors = ["Artem Khabarov"]
 
 # Змініть назву проєкта на свою
 title = "Система аналізу медіа-контенту"
