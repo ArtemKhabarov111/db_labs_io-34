@@ -17,7 +17,7 @@
 ## Реляційна схема
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/muddotaa/db_labs_io-34/f74c1e3dcad9f04b82d5ff3ab017c0f77023aeb7/assets/Lab4/Реляційна%20схема.png" width="1000">
+<img src="https://raw.githubusercontent.com/artemkhabarov111/db_labs_io-34/f74c1e3dcad9f04b82d5ff3ab017c0f77023aeb7/assets/Lab4/Реляційна%20схема.png" width="1000">
 
 
 </div>
